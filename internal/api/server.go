@@ -19,6 +19,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.aliveHandler)
 	mux.HandleFunc("/generateOtp", s.generateOTPHandler)
+	mux.HandleFunc("/verifyOtp", s.verifyOTPHandler)
 	return mux
 }
 
