@@ -20,3 +20,7 @@ type verifyOTPRequest struct {
 type verifyOTPResponse struct {
 	Match bool `json:"match"`
 }
+
+type expiryRequest struct {
+	UserID string `json:"userId"`
+}
