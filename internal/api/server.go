@@ -18,6 +18,7 @@ func NewServer() *Server {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.aliveHandler)
+	mux.HandleFunc("/generateOtp", s.generateOTPHandler)
 	return mux
 }
 
