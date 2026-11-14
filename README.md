@@ -23,3 +23,7 @@ configure its address (default: `localhost:6379`).
 | `GET` | `/generateOtp` | `{"userId":"user-123"}` | `{"otp":123456}` |
 | `POST` | `/verifyOtp` | `{"userId":"user-123","otp":123456}` | `{"match":true}` |
 | `DELETE` | `/expiry` | `{"userId":"user-123"}` | `204 No Content` |
+| `POST` | `/setTtl` | `{"ttl":60}` | `204 No Content` |
+
+New OTPs expire after the configured TTL, which defaults to 600 seconds. Use
+`POST /setTtl` to update the global TTL for subsequently stored OTPs.

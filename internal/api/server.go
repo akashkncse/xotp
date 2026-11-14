@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/akashkncse/xotp/internal/otp"
 )
@@ -13,6 +14,7 @@ type otpStore interface {
 	Save(ctx context.Context, userID, codeHash string) error
 	Find(ctx context.Context, userID string) (string, bool, error)
 	Delete(ctx context.Context, userID string) (bool, error)
+	SetDefaultTTL(ttl time.Duration)
 }
 
 type Server struct {
@@ -37,6 +39,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/generateOtp", s.generateOTPHandler)
 	mux.HandleFunc("/verifyOtp", s.verifyOTPHandler)
 	mux.HandleFunc("/expiry", s.expiryHandler)
+	mux.HandleFunc("/setTtl", s.setTTLHandler)
 	return mux
 }
 

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/akashkncse/xotp/internal/otp"
 	"github.com/alicebob/miniredis/v2"
@@ -34,7 +35,7 @@ func TestAliveHandler(t *testing.T) {
 }
 
 func TestGenerateAndVerifyOTPHandlers(t *testing.T) {
-	server := newTestServer(t)
+	server, _ := newTestServer(t)
 
 	generateRequest := httptest.NewRequest(http.MethodGet, "/generateOtp", bytes.NewBufferString(`{"userId":"user-123"}`))
 	generateResponse := httptest.NewRecorder()
@@ -67,7 +68,7 @@ func TestGenerateAndVerifyOTPHandlers(t *testing.T) {
 }
 
 func TestExpiryHandlerDeletesOTP(t *testing.T) {
-	server := newTestServer(t)
+	server, _ := newTestServer(t)
 	if err := server.store.Save(context.Background(), "user-123", otp.Hash("123456")); err != nil {
 		t.Fatalf("save OTP: %v", err)
 	}
@@ -86,7 +87,31 @@ func TestExpiryHandlerDeletesOTP(t *testing.T) {
 	}
 }
 
-func newTestServer(t *testing.T) *Server {
+func TestSetTTLHandlerConfiguresFutureOTPs(t *testing.T) {
+	server, client := newTestServer(t)
+
+	request := httptest.NewRequest(http.MethodPost, "/setTtl", bytes.NewBufferString(`{"ttl":60}`))
+	response := httptest.NewRecorder()
+	server.setTTLHandler(response, request)
+
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, response.Code)
+	}
+
+	if err := server.store.Save(context.Background(), "user-123", otp.Hash("123456")); err != nil {
+		t.Fatalf("save OTP: %v", err)
+	}
+
+	ttl, err := client.TTL(context.Background(), "xotp:otp:user-123").Result()
+	if err != nil {
+		t.Fatalf("read OTP TTL: %v", err)
+	}
+	if ttl <= 0 || ttl > time.Minute {
+		t.Fatalf("expected OTP TTL near 60 seconds, got %s", ttl)
+	}
+}
+
+func newTestServer(t *testing.T) (*Server, *redis.Client) {
 	t.Helper()
 	redisServer, err := miniredis.Run()
 	if err != nil {
@@ -96,5 +121,5 @@ func newTestServer(t *testing.T) *Server {
 
 	client := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
-	return NewServerWithStore(otp.NewStoreWithClient(client))
+	return NewServerWithStore(otp.NewStoreWithClient(client)), client
 }
