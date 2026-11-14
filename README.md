@@ -12,7 +12,8 @@ go run ./cmd/xotp
 ```
 
 The API listens on `http://localhost:8080`. Use `PORT` to configure another
-port.
+port. Start Redis with `docker compose up -d redis`; use `REDIS_ADDR` to
+configure its address (default: `localhost:6379`).
 
 ## Endpoints
 

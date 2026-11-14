@@ -22,7 +22,11 @@ func (s *Server) verifyOTPHandler(w http.ResponseWriter, r *http.Request) {
 
 	match := false
 	if request.OTP >= 0 && request.OTP <= 999999 {
-		storedHash, exists := s.store.Find(request.UserID)
+		storedHash, exists, err := s.store.Find(r.Context(), request.UserID)
+		if err != nil {
+			http.Error(w, "failed to retrieve OTP", http.StatusInternalServerError)
+			return
+		}
 		match = exists && storedHash == otp.Hash(fmt.Sprintf("%06d", request.OTP))
 	}
 

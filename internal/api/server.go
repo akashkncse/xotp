@@ -1,18 +1,34 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 
 	"github.com/akashkncse/xotp/internal/otp"
 )
 
+type otpStore interface {
+	Save(ctx context.Context, userID, codeHash string) error
+	Find(ctx context.Context, userID string) (string, bool, error)
+	Delete(ctx context.Context, userID string) (bool, error)
+}
+
 type Server struct {
-	store *otp.Store
+	store otpStore
 }
 
 func NewServer() *Server {
-	return &Server{store: otp.NewStore()}
+	addr := os.Getenv("REDIS_ADDR")
+	if addr == "" {
+		addr = "localhost:6379"
+	}
+	return NewServerWithStore(otp.NewStore(addr))
+}
+
+func NewServerWithStore(store otpStore) *Server {
+	return &Server{store: store}
 }
 
 func (s *Server) Handler() http.Handler {

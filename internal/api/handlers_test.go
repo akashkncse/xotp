@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/akashkncse/xotp/internal/otp"
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestAliveHandler(t *testing.T) {
@@ -31,7 +34,7 @@ func TestAliveHandler(t *testing.T) {
 }
 
 func TestGenerateAndVerifyOTPHandlers(t *testing.T) {
-	server := NewServer()
+	server := newTestServer(t)
 
 	generateRequest := httptest.NewRequest(http.MethodGet, "/generateOtp", bytes.NewBufferString(`{"userId":"user-123"}`))
 	generateResponse := httptest.NewRecorder()
@@ -64,8 +67,10 @@ func TestGenerateAndVerifyOTPHandlers(t *testing.T) {
 }
 
 func TestExpiryHandlerDeletesOTP(t *testing.T) {
-	server := NewServer()
-	server.store.Save("user-123", otp.Hash("123456"))
+	server := newTestServer(t)
+	if err := server.store.Save(context.Background(), "user-123", otp.Hash("123456")); err != nil {
+		t.Fatalf("save OTP: %v", err)
+	}
 
 	request := httptest.NewRequest(http.MethodDelete, "/expiry", bytes.NewBufferString(`{"userId":"user-123"}`))
 	response := httptest.NewRecorder()
@@ -74,7 +79,22 @@ func TestExpiryHandlerDeletesOTP(t *testing.T) {
 	if response.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", http.StatusNoContent, response.Code)
 	}
-	if _, exists := server.store.Find("user-123"); exists {
+	if _, exists, err := server.store.Find(context.Background(), "user-123"); err != nil {
+		t.Fatalf("find OTP: %v", err)
+	} else if exists {
 		t.Fatal("expected OTP to be deleted")
 	}
+}
+
+func newTestServer(t *testing.T) *Server {
+	t.Helper()
+	redisServer, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("start Redis: %v", err)
+	}
+	t.Cleanup(redisServer.Close)
+
+	client := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	return NewServerWithStore(otp.NewStoreWithClient(client))
 }

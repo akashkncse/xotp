@@ -1,37 +1,44 @@
 package otp
 
-import "sync"
+import (
+	"context"
+	"errors"
+
+	"github.com/redis/go-redis/v9"
+)
 
 type Store struct {
-	mu   sync.RWMutex
-	data map[string]string
+	client *redis.Client
 }
 
-func NewStore() *Store {
-	return &Store{data: make(map[string]string)}
+func NewStore(addr string) *Store {
+	return &Store{client: redis.NewClient(&redis.Options{Addr: addr})}
 }
 
-func (s *Store) Save(userID, codeHash string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.data[userID] = codeHash
+func NewStoreWithClient(client *redis.Client) *Store {
+	return &Store{client: client}
 }
 
-func (s *Store) Find(userID string) (string, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	codeHash, exists := s.data[userID]
-	return codeHash, exists
+func (s *Store) Save(ctx context.Context, userID, codeHash string) error {
+	return s.client.Set(ctx, key(userID), codeHash, 0).Err()
 }
 
-func (s *Store) Delete(userID string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, exists := s.data[userID]; !exists {
-		return false
+func (s *Store) Find(ctx context.Context, userID string) (string, bool, error) {
+	codeHash, err := s.client.Get(ctx, key(userID)).Result()
+	if errors.Is(err, redis.Nil) {
+		return "", false, nil
 	}
+	if err != nil {
+		return "", false, err
+	}
+	return codeHash, true, nil
+}
 
-	delete(s.data, userID)
-	return true
+func (s *Store) Delete(ctx context.Context, userID string) (bool, error) {
+	deleted, err := s.client.Del(ctx, key(userID)).Result()
+	return deleted > 0, err
+}
+
+func key(userID string) string {
+	return "xotp:otp:" + userID
 }

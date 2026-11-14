@@ -17,6 +17,9 @@ func (s *Server) expiryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.store.Delete(request.UserID)
+	if _, err := s.store.Delete(r.Context(), request.UserID); err != nil {
+		http.Error(w, "failed to delete OTP", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }

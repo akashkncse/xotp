@@ -32,6 +32,9 @@ func (s *Server) generateOTPHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.store.Save(request.UserID, otp.Hash(code))
+	if err := s.store.Save(r.Context(), request.UserID, otp.Hash(code)); err != nil {
+		http.Error(w, "failed to store OTP", http.StatusInternalServerError)
+		return
+	}
 	writeJSON(w, http.StatusOK, generateOTPResponse{OTP: codeNumber})
 }
